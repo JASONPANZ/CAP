@@ -96,4 +96,4 @@ CallbackName |	回调的订阅者名称 | string
 
 * DM（达梦数据库）([@findersky](https://github.com/findersky)) ：https://github.com/findersky/CAP
 
-* GaussDB ([@JASONPANZ](https://github.com/JASONPANZ)) ：https://github.com/JASONPANZ/CAP
+* GaussDB ([@JASONPANZ](https://github.com/JASONPANZ)) ：https://github.com/JASONPANZ/CAP/tree/HuaweiCloud-GaussDB
