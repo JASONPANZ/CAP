@@ -70,39 +70,9 @@ namespace DotNetCore.CAP.GaussDB
         }
 
         /// <summary>
-        /// 通过管理数据库查询当前连接字符串中的目标数据库是否已经存在。
-        /// </summary>
-        /// <param name="connection">包含目标数据库名的业务连接。</param>
-        /// <param name="adminDatabase">用于查询 pg_database 的管理数据库，默认 postgres。</param>
-        /// <returns>目标数据库存在返回 true；连接或查询失败时返回 false。</returns>
-        public static async Task<bool> DataBaseIsExistsAsync(this DbConnection connection, string adminDatabase = "postgres")
-        {
-            if (connection == null) throw new ArgumentNullException(nameof(connection));
-
-            try
-            {
-                var builder = new GaussDBConnectionStringBuilder(connection.ConnectionString);
-                var databaseName = builder.Database ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(databaseName)) return false;
-
-                builder.Database = string.IsNullOrWhiteSpace(adminDatabase) ? "postgres" : adminDatabase;
-                using var adminConnection = new GaussDBConnection(builder.ToString());
-                var result = await ExecuteScalarAsync<bool>(adminConnection,
-                    @"SELECT EXISTS (SELECT datname FROM pg_catalog.pg_database WHERE datname = @dbname) AS IsExists;",
-                    new GaussDBParameter("@dbname", databaseName));
-
-                return true.Equals(result);
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
         /// 获取当前连接对应数据库的兼容模式，并映射为 provider 内部枚举。
         /// </summary>
-        public static async Task<GaussDBCompatibilityMode> GetGaussDBCompatibilityModeAsync(this DbConnection connection)
+        public static async Task<GaussDBCompatibilityMode> GetGaussDBCompatibilityModeAsync(this GaussDBConnection connection)
         {
             var compatibilityMode = await QuerytGaussDBCompatibilityModeAsync(connection);
             switch ((compatibilityMode ?? string.Empty).Trim().ToUpperInvariant())

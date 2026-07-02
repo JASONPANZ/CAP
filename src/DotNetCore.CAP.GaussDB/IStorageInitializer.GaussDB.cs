@@ -79,6 +79,8 @@ namespace DotNetCore.CAP.GaussDB
             await WaitUntilDatabaseExistsAsync(cancellationToken).ConfigureAwait(false);
             // 开始初始化
             await InitializeCoreAsync(cancellationToken).ConfigureAwait(false);
+
+            _logger.LogInformation("CAP GaussDB database Initialization successful !!!");
         }
 
         /// <summary>
@@ -253,29 +255,30 @@ WHERE NOT EXISTS (SELECT 1 FROM {GetLockTableName()} WHERE `Key` = @RecKey);
         private async Task WaitUntilDatabaseExistsAsync(CancellationToken cancellationToken)
         {
             var connection = _options.Value.CreateConnection();
-            var databaseName = new GaussDBConnectionStringBuilder(connection.ConnectionString).Database;
+            var databaseName = connection.Database;
 
             try
             {
                 var maxRetries = _options.Value.StartupCheckDatabaseExistsMaxRetries;
-                for (var retry = 0; retry <= maxRetries; retry++)
+                for (var retry = 1; retry <= maxRetries; retry++)
                 {
-                    var exsit = await connection.DataBaseIsExistsAsync(_options.Value.AdminDatabaseName).ConfigureAwait(false);
+                    var exsit = await DataBaseIsExistsAsync(connection, _options.Value.AdminDatabaseName).ConfigureAwait(false);
                     if (exsit) return;
 
                     var delay = ComputeBackoffDelay(retry, _options.Value.StartupCheckDatabaseExistsBaseDelay, _options.Value.StartupCheckDatabaseExistsMaxDelay);
 
                     _logger.LogWarning("[{CountThis}´th] GaussDB database '{Database}' does not exist.{CountNext}´th Retrying in {DelaySeconds} seconds.",
-                      retry + 1,
+                      retry,
                       databaseName,
-                      retry + 2,
+                      retry + 1,
                       delay.TotalSeconds);
 
                     await DelayBeforeDatabaseExistsRetryAsync(delay, cancellationToken).ConfigureAwait(false);
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "等待CAP的目标数据库创建完成过程失败.");
                 throw;
             }
             finally
@@ -286,6 +289,42 @@ WHERE NOT EXISTS (SELECT 1 FROM {GetLockTableName()} WHERE `Key` = @RecKey);
             throw new InvalidOperationException($"GaussDB database '{databaseName}' does not exist.");
         }
 
+
+        /// <summary>
+        /// 通过管理数据库查询当前连接字符串中的目标数据库是否已经存在。
+        /// </summary>
+        /// <param name="connection">包含目标数据库名的业务连接。</param>
+        /// <param name="adminDatabase">用于查询 pg_database 的管理数据库，默认 postgres。</param>
+        /// <returns>目标数据库存在返回 true；连接或查询失败时返回 false。</returns>
+        public virtual async Task<bool> DataBaseIsExistsAsync(GaussDBConnection connection, string adminDatabase = "postgres")
+        {
+            if (connection == null) throw new ArgumentNullException(nameof(connection));
+
+            try
+            {
+                var builder = new GaussDBConnectionStringBuilder(connection.ConnectionString);
+                var databaseName = builder.Database ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(databaseName)) return false;
+
+                builder.Database = string.IsNullOrWhiteSpace(adminDatabase) ? "postgres" : adminDatabase;
+
+                using (var adminConnection = connection.CloneWith(builder.ToString()))
+                {
+                    var result = await adminConnection.ExecuteScalarAsync<bool>(
+                        @"SELECT EXISTS (SELECT datname FROM pg_catalog.pg_database WHERE datname = @dbname) AS IsExists;",
+                        new GaussDBParameter("@dbname", databaseName));
+
+                    return true.Equals(result);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "查询CAP的目标数据库失败.");
+                return false;
+            }
+        }
+
+
         /// <summary>
         /// 按指数退避计算下一次数据库存在性探测的等待时间。
         /// </summary>
@@ -294,7 +333,7 @@ WHERE NOT EXISTS (SELECT 1 FROM {GetLockTableName()} WHERE `Key` = @RecKey);
         /// <param name="maxDelay">允许的最大等待间隔。</param>
         /// <returns>本次重试前需要等待的时间。</returns>
         /// <remarks>
-        /// 当基础间隔为 1 秒时，等待序列为 1s、1s、2s、4s，并持续翻倍直到达到最大间隔。
+        /// 当基础间隔为 1 秒时，等待序列为 1s、2s、4s，并持续翻倍直到达到最大间隔。
         /// </remarks>
         private static TimeSpan ComputeBackoffDelay(int attempt, TimeSpan baseDelay, TimeSpan maxDelay)
         {

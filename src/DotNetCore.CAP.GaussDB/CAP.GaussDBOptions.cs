@@ -28,29 +28,29 @@ namespace DotNetCore.CAP
         /// <summary>
         /// 管理员数据库名称
         /// </summary>
-        public string AdminDatabaseName = "postgres";
+        public string AdminDatabaseName { get; set; } = "postgres";
 
         /// <summary>
         /// 启动时探测数据库是否存在的基础等待间隔，默认 1 秒。
         /// <para>实际等待时间会按重试次数指数递增，并受最大等待间隔限制。</para>
         /// </summary>
-        public TimeSpan StartupCheckDatabaseExistsBaseDelay = TimeSpan.FromSeconds(1);
+        public TimeSpan StartupCheckDatabaseExistsBaseDelay { get; set; } = TimeSpan.FromSeconds(1);
 
         /// <summary>
         /// 单次启动探测允许等待的最大间隔，默认 1 分钟。
         /// <para>用于目标数据库尚未创建完成时限制每次退避等待的上限。</para>
         /// </summary>
-        public TimeSpan StartupCheckDatabaseExistsMaxDelay = TimeSpan.FromMinutes(1);
+        public TimeSpan StartupCheckDatabaseExistsMaxDelay { get; set; } = TimeSpan.FromMinutes(1);
 
         /// <summary>
         /// 启动时探测数据库是否存在的最大重试次数，默认 5 次。
         /// </summary>
-        public int StartupCheckDatabaseExistsMaxRetries = 5;
+        public int StartupCheckDatabaseExistsMaxRetries { get; set; } = 5;
 
         /// <summary>
         /// 是否启用：当用用户没有主动设置`NoResetOnClose`时，将会自动设置：`NoResetOnClose` = true;
         /// </summary>
-        public bool EnableAutoSetNoResetOnClose = true;
+        public bool EnableAutoSetNoResetOnClose { get; set; } = true;
 
         /// <summary>
         /// 根据配置创建新的 GaussDB 连接。
