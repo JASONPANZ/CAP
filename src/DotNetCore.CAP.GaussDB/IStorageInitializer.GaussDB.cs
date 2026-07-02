@@ -88,6 +88,8 @@ namespace DotNetCore.CAP.GaussDB
         /// </summary>
         protected virtual async Task InitializeCoreAsync(CancellationToken cancellationToken)
         {
+            if (cancellationToken.IsCancellationRequested) return;
+
             var connection = _options.Value.CreateConnection();
             await using var _ = connection.ConfigureAwait(false);
             object[] sqlParams =
@@ -254,6 +256,8 @@ WHERE NOT EXISTS (SELECT 1 FROM {GetLockTableName()} WHERE `Key` = @RecKey);
         /// <exception cref="InvalidOperationException">超过最大重试次数后目标数据库仍不存在。</exception>
         private async Task WaitUntilDatabaseExistsAsync(CancellationToken cancellationToken)
         {
+            if (cancellationToken.IsCancellationRequested) return;
+
             var connection = _options.Value.CreateConnection();
             var databaseName = connection.Database;
 
@@ -266,12 +270,11 @@ WHERE NOT EXISTS (SELECT 1 FROM {GetLockTableName()} WHERE `Key` = @RecKey);
                     if (exsit) return;
 
                     var delay = ComputeBackoffDelay(retry, _options.Value.StartupCheckDatabaseExistsBaseDelay, _options.Value.StartupCheckDatabaseExistsMaxDelay);
-
-                    _logger.LogWarning("[{CountThis}´th] GaussDB database '{Database}' does not exist.{CountNext}´th Retrying in {DelaySeconds} seconds.",
-                      retry,
-                      databaseName,
-                      retry + 1,
-                      delay.TotalSeconds);
+                    _logger.LogWarning("Attempt {CountThis} of {Totle}: GaussDB database '{Database}' does not exist. Retrying in {DelaySeconds:F0} seconds.",
+                         retry,
+                         maxRetries,
+                         databaseName,
+                         delay.TotalSeconds);
 
                     await DelayBeforeDatabaseExistsRetryAsync(delay, cancellationToken).ConfigureAwait(false);
                 }
