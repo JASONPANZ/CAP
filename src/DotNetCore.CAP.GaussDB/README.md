@@ -11,21 +11,19 @@ DotNetCore.CAP.GaussDB 是 [CAP](https://cap.dotnetcore.xyz) 分布式事务/Eve
 
 - 支持 GaussDB 多种数据库兼容模式
 - 支持 ADO.NET 直接连接与 EF Core 绑定两种配置方式
-- 内置分布式存储锁，保障多实例下的任务安全调度
-- 兼容 CAP 全部功能：发布/订阅、延迟消息、失败重试、过期清理、Dashboard 监控
 - 跟随 CAP 面向 `.NET 8`、`.NET 9`、`.NET 10` 发布
 
 ---
 
 ## 支持的 GaussDB 兼容模式
 
-| 兼容模式 | 数据库示例 | 说明 |
-|:---|:---|:---|
-| **Oracle** | DB_A | `datcompatibility = 'A'` 或 `'ORA'` |
-| **MySQL** | DB_B | `datcompatibility = 'B'` 或 `'MYSQL'` |
-| **Teradata** | DB_C | `datcompatibility = 'C'` 或 `'TD'` |
-| **PostgreSQL** | DB_PG | `datcompatibility = 'PG'` |
-| **M-Compatibility** | — | `datcompatibility = 'M'`（MySQL 风格反引号语法，暂不测试） |
+| 兼容模式 |  说明 |
+|:---|:---|
+| **Oracle** |  `datcompatibility = 'A'` 或 `'ORA'` |
+| **MySQL** | `datcompatibility = 'B'` 或 `'MYSQL'` |
+| **Teradata** |  `datcompatibility = 'C'` 或 `'TD'` |
+| **PostgreSQL** |  `datcompatibility = 'PG'` |
+| **M-Compatibility** | `datcompatibility = 'M'`（MySQL 风格反引号语法） |
 
 启动时会自动探测数据库兼容模式，根据模式选择对应的 SQL 方言（标识符引用、数据类型、时间函数等）。
 
@@ -48,7 +46,7 @@ dotnet add package DotNetCore.CAP.GaussDB
 ```csharp
 services.AddCap(x =>
 {
-    x.UseGaussDB("host=192.168.1.63;port=25432;uid=root;pwd=your_password;Database=mydb;sslmode=Disable");
+    x.UseGaussDB("host=xxxx;port=xxxx;uid=xxxx;pwd=your_password;Database=mydb;sslmode=Disable");
     x.UseRabbitMQ("...");  // 任选一种消息队列传输器
 });
 ```
@@ -60,7 +58,7 @@ services.AddCap(x =>
 {
     x.UseGaussDB(opt =>
     {
-        opt.ConnectionString = "host=192.168.1.63;port=25432;uid=root;pwd=your_password;Database=mydb";
+        opt.ConnectionString = "host=xxxx;port=xxxx;uid=xxxx;pwd=your_password;Database=mydb";
         opt.Schema = "cap";                     // 默认值 "cap"
         opt.AdminDatabaseName = "postgres";     // 启动时用于探测数据库存在的管理库
         opt.StartupCheckDatabaseExistsMaxRetries = 5;   // 数据库存在性探测重试次数
@@ -74,7 +72,7 @@ services.AddCap(x =>
 
 ```csharp
 services.AddDbContext<AppDbContext>(options =>
-    options.UseGaussDB("host=192.168.1.63;port=25432;uid=root;pwd=your_password;Database=mydb"));
+    options.UseGaussDB("host=xxxx;port=xxxx;uid=xxxx;pwd=your_password;Database=mydb"));
 
 services.AddCap(x =>
 {
@@ -85,41 +83,6 @@ services.AddCap(x =>
     x.UseRabbitMQ("...");
 });
 ```
-
----
-
-## 事务集成
-
-CAP GaussDB 支持将数据库事务与消息发布绑定，确保业务数据与消息原子一致。
-
-### ADO.NET 事务
-
-```csharp
-using var connection = new GaussDBConnection(connectionString);
-var publisher = serviceProvider.GetRequiredService<ICapPublisher>();
-
-var transaction = connection.BeginTransaction(publisher);
-// ... 执行业务 SQL，使用同一个 transaction ...
-transaction.Commit();  // 数据库提交后自动 Flush CAP 消息队列
-```
-
-### EF Core 事务
-
-```csharp
-await using var context = new AppDbContext();
-var publisher = serviceProvider.GetRequiredService<ICapPublisher>();
-
-var transaction = await context.Database.BeginTransactionAsync(publisher);
-// ... EF Core 业务操作 ...
-await transaction.CommitAsync();  // 提交后自动 Flush 消息
-```
-
-### 事务行为
-
-| 操作 | 数据库行为 | CAP 消息行为 |
-|:---|:---|:---|
-| `Commit()` | 提交数据库事务 | 刷新待发布消息到队列 |
-| `Rollback()` | 回滚数据库事务 | 消息不发送 |
 
 ---
 
@@ -140,18 +103,6 @@ await transaction.CommitAsync();  // 提交后自动 Flush 消息
 
 ---
 
-## 存储结构
-
-GaussDB 存储提供程序会在指定 Schema 下创建三张表：
-
-| 表 | 用途 |
-|:---|:---|
-| `{schema}.published` | 发布消息记录（Id、Name、Content、StatusName 等） |
-| `{schema}.received` | 接收消息记录（额外包含 Group 字段） |
-| `{schema}.lock` | 分布式锁记录（仅在 `UseStorageLock=true` 时创建） |
-
----
-
 ## 兼容模式 SQL 方言
 
 不同兼容模式下，SQL 语法自动适配：
@@ -164,7 +115,6 @@ GaussDB 存储提供程序会在指定 Schema 下创建三张表：
 | 时间累加 | `"Col" + interval 'N' second` | `date_add(col, interval N second)` |
 | 小时聚合 | `to_char("Added", 'yyyy-MM-dd-HH')` | `DATE_FORMAT(Added, '%Y-%m-%d-%H')` |
 | 数据类型 | `TIMESTAMP` / `TEXT` | `datetime` / `longtext` |
-| 存储引擎 | — | `ENGINE=InnoDB` |
 
 ---
 
@@ -175,7 +125,3 @@ GaussDB 存储提供程序会在指定 Schema 下创建三张表：
 - [HuaweiCloud.EntityFrameworkCore.GaussDB](https://www.nuget.org/packages/HuaweiCloud.EntityFrameworkCore.GaussDB/) — GaussDB EF Core Provider（可选，使用 EF 时需要）
 
 ---
-
-## 许可证
-
-本项目基于 MIT 协议开源，详见 [LICENSE](https://raw.githubusercontent.com/dotnetcore/CAP/master/LICENSE.txt)。
