@@ -5,7 +5,7 @@ namespace DotNetCore.CAP.GaussDB.Test;
 
 internal static class ConnectionUtil
 {
-    private const string ConnectionStringEnvironmentVariable = "Cap_GaussDB_ConnectionString";
+    private const string ConnectionStringEnvironmentVariable = "GaussDB_ConnectionString";
     private const string ConnectionStringTemplateEnvironmentVariable = "Cap_GaussDB_ConnectionStringTemplate";
 
     public const string DefaultDatabase = "DB_PG";
